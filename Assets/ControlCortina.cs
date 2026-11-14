@@ -23,6 +23,9 @@ public class ControlCortina : MonoBehaviour
     [Header("Script de Manipulación AR")]
     public ManipularBicicletaAR scriptManipulacionAR;
 
+    [Header("Gestor de Personalización")]
+    public GestorPersonalizacionAR gestorPersonalizacion;
+
     private bool subiendoCortina = false;
     private Vector2 posicionObjetivoUI;
 
@@ -43,6 +46,11 @@ public class ControlCortina : MonoBehaviour
         if (panelCategorias != null) panelCategorias.SetActive(false);
         if (botonRegresar != null) botonRegresar.SetActive(false);
         if (panelFlechas != null) panelFlechas.SetActive(false);
+
+        if (gestorPersonalizacion != null)
+        {
+            gestorPersonalizacion.SalirDePersonalizacion();
+        }
 
         OcultarTodasLasBicis();
     }
@@ -110,6 +118,11 @@ public class ControlCortina : MonoBehaviour
             scriptManipulacionAR.DesactivarManipulacion();
         }
 
+        if (gestorPersonalizacion != null)
+        {
+            gestorPersonalizacion.SalirDePersonalizacion();
+        }
+
         if (grupoActivo != null)
         {
             grupoActivo.SetActive(true);
@@ -164,18 +177,30 @@ public class ControlCortina : MonoBehaviour
         if (botonRegresar != null) botonRegresar.SetActive(true);
 
         Transform biciActiva = grupoActivo.transform.GetChild(indiceBiciActual);
-        if (scriptManipulacionAR != null && biciActiva != null)
+        if (gestorPersonalizacion != null && biciActiva != null)
         {
-            scriptManipulacionAR.ActivarManipulacion(biciActiva.gameObject);
+            gestorPersonalizacion.IniciarPersonalizacion(biciActiva.gameObject);
         }
     }
 
     // --- REGRESAR ---
     public void RegresarAMenu()
     {
+        // Nivel 1: Si había un subpanel abierto (Color, Llantas o Accesorios), primero cierra ese subpanel
+        if (biciSeleccionada && gestorPersonalizacion != null && gestorPersonalizacion.IntentarCerrarSubpanel())
+        {
+            return;
+        }
+
+        // Nivel 2: Si estaba en el menú de los 6 botones, oculta personalización y regresa al carrusel
         if (biciSeleccionada)
         {
             biciSeleccionada = false;
+
+            if (gestorPersonalizacion != null)
+            {
+                gestorPersonalizacion.SalirDePersonalizacion();
+            }
 
             if (scriptManipulacionAR != null)
             {
@@ -186,6 +211,7 @@ public class ControlCortina : MonoBehaviour
             return;
         }
 
+        // Nivel 3: Si estaba en el carrusel, regresa al menú de categorías
         OcultarTodasLasBicis();
         ActivarMenuCategorias();
     }
