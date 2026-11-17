@@ -29,7 +29,8 @@ public class GestorPersonalizacionAR : MonoBehaviour
     public ManipularBicicletaAR scriptManipulacionAR;
 
     private BiciPersonalizable biciActual;
-    private float factorGrosorActual = 1.0f;
+    private float factorAnchoActual = 1.0f;
+    private float factorRodadaActual = 1.0f;
     private bool subpanelAbierto = false;
 
     public void IniciarPersonalizacion(GameObject biciObj)
@@ -40,7 +41,8 @@ public class GestorPersonalizacionAR : MonoBehaviour
             biciActual.GuardarEstadoInicial();
         }
 
-        factorGrosorActual = 1.0f;
+        factorAnchoActual = 1.0f;
+        factorRodadaActual = 1.0f;
         CerrarTodosLosSubpaneles();
 
         if (panelPersonalizado != null) panelPersonalizado.SetActive(true);
@@ -85,28 +87,21 @@ public class GestorPersonalizacionAR : MonoBehaviour
 
     public void CambiarColorCuadro(string hexColor)
     {
-        if (biciActual == null || biciActual.renderersCuadro == null) return;
+        if (biciActual == null) return;
 
         if (ColorUtility.TryParseHtmlString(hexColor, out Color nuevoColor))
         {
-            foreach (Renderer r in biciActual.renderersCuadro)
-            {
-                if (r != null) r.material.color = nuevoColor;
-            }
+            biciActual.AplicarColorCuadro(nuevoColor);
         }
     }
 
     public void CambiarColorCuadroDirecto(Color nuevoColor)
     {
-        if (biciActual == null || biciActual.renderersCuadro == null) return;
-
-        foreach (Renderer r in biciActual.renderersCuadro)
-        {
-            if (r != null) r.material.color = nuevoColor;
-        }
+        if (biciActual == null) return;
+        biciActual.AplicarColorCuadro(nuevoColor);
     }
 
-    // --- 3. BOTÓN LLANTAS ---
+    // --- 3. BOTÓN LLANTAS (4 BOTONES: RODADA +/- Y ANCHO +/-) ---
     public void AbrirSubpanelLlantas()
     {
         CerrarTodosLosSubpaneles();
@@ -116,24 +111,67 @@ public class GestorPersonalizacionAR : MonoBehaviour
         if (subpanelLlantas != null) subpanelLlantas.SetActive(true);
     }
 
-    public void CambiarGrosorLlantas(float nuevoFactor)
+    public void AumentarRodada()
     {
         if (biciActual == null) return;
+        float nuevaRodada = factorRodadaActual + 0.08f;
 
-        if (nuevoFactor > biciActual.anchoMaximoLlanta)
+        if (nuevaRodada > biciActual.rodadaMaximaLlanta)
         {
-            MostrarAlerta($"¡Incompatible! Estas llantas ({nuevoFactor:F1}x) son demasiado anchas para el cuadro de {biciActual.categoria}.");
+            MostrarAlerta($"¡Incompatible! Una rodada más grande chocaría con la horquilla del cuadro de {biciActual.categoria}.");
             return;
         }
 
-        factorGrosorActual = nuevoFactor;
+        factorRodadaActual = nuevaRodada;
+        biciActual.AplicarDimensionesLlantas(factorAnchoActual, factorRodadaActual);
+        ActualizarFichaTecnica();
+    }
 
-        if (biciActual.llantaDelantera != null)
-            biciActual.llantaDelantera.localScale = new Vector3(factorGrosorActual, 1f + (factorGrosorActual - 1f) * 0.25f, 1f + (factorGrosorActual - 1f) * 0.25f);
+    public void DisminuirRodada()
+    {
+        if (biciActual == null) return;
+        float nuevaRodada = factorRodadaActual - 0.08f;
 
-        if (biciActual.llantaTrasera != null)
-            biciActual.llantaTrasera.localScale = new Vector3(factorGrosorActual, 1f + (factorGrosorActual - 1f) * 0.25f, 1f + (factorGrosorActual - 1f) * 0.25f);
+        if (nuevaRodada < 0.76f)
+        {
+            MostrarAlerta("¡Límite alcanzado! No se puede reducir más la rodada de la bicicleta.");
+            return;
+        }
 
+        factorRodadaActual = nuevaRodada;
+        biciActual.AplicarDimensionesLlantas(factorAnchoActual, factorRodadaActual);
+        ActualizarFichaTecnica();
+    }
+
+    public void AumentarAnchoLlanta()
+    {
+        if (biciActual == null) return;
+        float nuevoAncho = factorAnchoActual + 0.15f;
+
+        if (nuevoAncho > biciActual.anchoMaximoLlanta)
+        {
+            MostrarAlerta($"¡Incompatible! Estas llantas son demasiado anchas para el cuadro de {biciActual.categoria}.");
+            return;
+        }
+
+        factorAnchoActual = nuevoAncho;
+        biciActual.AplicarDimensionesLlantas(factorAnchoActual, factorRodadaActual);
+        ActualizarFichaTecnica();
+    }
+
+    public void DisminuirAnchoLlanta()
+    {
+        if (biciActual == null) return;
+        float nuevoAncho = factorAnchoActual - 0.15f;
+
+        if (nuevoAncho < 0.70f)
+        {
+            MostrarAlerta("¡Límite alcanzado! No se puede hacer más delgada la llanta.");
+            return;
+        }
+
+        factorAnchoActual = nuevoAncho;
+        biciActual.AplicarDimensionesLlantas(factorAnchoActual, factorRodadaActual);
         ActualizarFichaTecnica();
     }
 
@@ -178,12 +216,13 @@ public class GestorPersonalizacionAR : MonoBehaviour
         ActualizarFichaTecnica();
     }
 
-    // --- BOTÓN REINICIAR (DENTRO DE MANIPULACIÓN) ---
+    // --- BOTÓN REINICIAR ---
     public void ReiniciarBicicleta()
     {
         if (biciActual == null) return;
         biciActual.ReiniciarBici();
-        factorGrosorActual = 1.0f;
+        factorAnchoActual = 1.0f;
+        factorRodadaActual = 1.0f;
         ActualizarFichaTecnica();
 
         if (scriptManipulacionAR != null && subpanelManipulacion != null && subpanelManipulacion.activeSelf)
@@ -226,7 +265,7 @@ public class GestorPersonalizacionAR : MonoBehaviour
         if (biciActual.objLuces != null && biciActual.objLuces.activeSelf) total += biciActual.precioLuces;
         if (biciActual.objSalpicaderas != null && biciActual.objSalpicaderas.activeSelf) total += biciActual.precioSalpicaderas;
         if (biciActual.objEstampas != null && biciActual.objEstampas.activeSelf) total += biciActual.precioEstampas;
-        if (factorGrosorActual > 1.05f) total += biciActual.precioLlantaAncha;
+        if (factorAnchoActual > 1.05f || factorRodadaActual > 1.04f) total += biciActual.precioLlantaExtra;
 
         if (txtNombreBici != null) txtNombreBici.text = biciActual.nombreModelo;
         if (txtDescripcionBici != null) txtDescripcionBici.text = biciActual.descripcion;

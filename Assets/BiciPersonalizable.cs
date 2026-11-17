@@ -14,6 +14,8 @@ public class BiciPersonalizable : MonoBehaviour
 
     [Header("Piezas Modificables")]
     public Renderer[] renderersCuadro;
+    [Tooltip("Deja en 0 si la pieza solo tiene 1 material. Si tiene varios (ej. Bike), pon el índice del cuadro.")]
+    public int indiceMaterialCuadro = 0;
     public Transform llantaDelantera;
     public Transform llantaTrasera;
 
@@ -26,11 +28,13 @@ public class BiciPersonalizable : MonoBehaviour
     public float precioLuces = 450f;
     public float precioSalpicaderas = 380f;
     public float precioEstampas = 250f;
-    public float precioLlantaAncha = 600f;
+    public float precioLlantaExtra = 600f;
 
     [Header("Reglas de Compatibilidad del Cuadro")]
     [Tooltip("Ej: 1.15 para Competencia, 1.35 para Tradicional, 1.6 para Montaña")]
     public float anchoMaximoLlanta = 1.4f;
+    [Tooltip("Ej: 1.10 para Tradicional/Competencia, 1.25 para Montaña")]
+    public float rodadaMaximaLlanta = 1.15f;
     public bool permiteSalpicaderas = true;
 
     private Color[] coloresOriginales;
@@ -51,7 +55,11 @@ public class BiciPersonalizable : MonoBehaviour
             for (int i = 0; i < renderersCuadro.Length; i++)
             {
                 if (renderersCuadro[i] != null)
-                    coloresOriginales[i] = renderersCuadro[i].material.color;
+                {
+                    Material[] mats = renderersCuadro[i].materials;
+                    int idx = Mathf.Clamp(indiceMaterialCuadro, 0, mats.Length - 1);
+                    coloresOriginales[i] = mats[idx].color;
+                }
             }
         }
 
@@ -64,6 +72,45 @@ public class BiciPersonalizable : MonoBehaviour
         inicializado = true;
     }
 
+    public void AplicarColorCuadro(Color nuevoColor)
+    {
+        GuardarEstadoInicial();
+        if (renderersCuadro == null) return;
+
+        for (int i = 0; i < renderersCuadro.Length; i++)
+        {
+            if (renderersCuadro[i] != null)
+            {
+                Material[] mats = renderersCuadro[i].materials;
+                int idx = Mathf.Clamp(indiceMaterialCuadro, 0, mats.Length - 1);
+                mats[idx].color = nuevoColor;
+            }
+        }
+    }
+
+    public void AplicarDimensionesLlantas(float factorAncho, float factorRodada)
+    {
+        GuardarEstadoInicial();
+
+        if (llantaDelantera != null)
+        {
+            llantaDelantera.localScale = new Vector3(
+                escalaOriginalDelantera.x * factorAncho,
+                escalaOriginalDelantera.y * factorRodada,
+                escalaOriginalDelantera.z * factorRodada
+            );
+        }
+
+        if (llantaTrasera != null)
+        {
+            llantaTrasera.localScale = new Vector3(
+                escalaOriginalTrasera.x * factorAncho,
+                escalaOriginalTrasera.y * factorRodada,
+                escalaOriginalTrasera.z * factorRodada
+            );
+        }
+    }
+
     public void ReiniciarBici()
     {
         GuardarEstadoInicial();
@@ -72,8 +119,12 @@ public class BiciPersonalizable : MonoBehaviour
         {
             for (int i = 0; i < renderersCuadro.Length; i++)
             {
-                if (renderersCuadro[i] != null)
-                    renderersCuadro[i].material.color = coloresOriginales[i];
+                if (renderersCuadro[i] != null && i < coloresOriginales.Length)
+                {
+                    Material[] mats = renderersCuadro[i].materials;
+                    int idx = Mathf.Clamp(indiceMaterialCuadro, 0, mats.Length - 1);
+                    mats[idx].color = coloresOriginales[i];
+                }
             }
         }
 
