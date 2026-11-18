@@ -2,141 +2,132 @@ using UnityEngine;
 
 public class BiciPersonalizable : MonoBehaviour
 {
-    [Header("Ficha Técnica Base")]
-    public string nombreModelo = "Bici Montaña Pro";
-    public string categoria = "Montaña";
+    public enum TipoCuadro { Tradicional, Competencia, Montana }
+
+    [Header("Información General")]
+    public string nombreModelo = "Bicicleta";
+    public string categoria = "Tradicional";
+    public TipoCuadro tipoCuadro = TipoCuadro.Tradicional;
     [TextArea(2, 4)]
-    public string descripcion = "Cuadro de aluminio reforzado, doble suspensión y frenos de disco.";
-    public float precioBase = 12500f;
+    public string descripcion = "Bicicleta personalizable";
+    public float precioBase = 3500f;
 
-    [Header("Escala Real (1:1 en el mundo real)")]
-    public Vector3 escalaTamanoReal = new Vector3(1f, 1f, 1f);
-
-    [Header("Piezas Modificables")]
+    [Header("Partes para Color del Cuadro")]
     public Renderer[] renderersCuadro;
-    [Tooltip("Deja en 0 si la pieza solo tiene 1 material. Si tiene varios (ej. Bike), pon el índice del cuadro.")]
-    public int indiceMaterialCuadro = 0;
-    public Transform llantaDelantera;
-    public Transform llantaTrasera;
 
-    [Header("Accesorios (Objetos hijos dentro de la bici)")]
-    public GameObject objLuces;
-    public GameObject objSalpicaderas;
-    public GameObject objEstampas;
+    [Header("Llantas y Límites")]
+    public Transform ruedaDelantera;
+    public Transform ruedaTrasera;
+    public float rodadaMaximaLlanta = 1.16f;
+    public float anchoMaximoLlanta = 1.30f;
 
-    [Header("Precios de Extras")]
-    public float precioLuces = 450f;
-    public float precioSalpicaderas = 380f;
-    public float precioEstampas = 250f;
-    public float precioLlantaExtra = 600f;
+    [Header("Accesorios 3D (Hijos de esta bici)")]
+    public GameObject objLuz1;          // Accesorio1 (Permitido en todas)
+    public GameObject objLuz2;          // Accesorio2 (Permitido en todas)
+    public GameObject objSalpicadera1;  // Accesorio3 (Solo Tradicional)
+    public GameObject objSalpicadera2;  // Accesorio4 (Solo Competencia y Montaña)
 
-    [Header("Reglas de Compatibilidad del Cuadro")]
-    [Tooltip("Ej: 1.15 para Competencia, 1.35 para Tradicional, 1.6 para Montaña")]
-    public float anchoMaximoLlanta = 1.4f;
-    [Tooltip("Ej: 1.10 para Tradicional/Competencia, 1.25 para Montaña")]
-    public float rodadaMaximaLlanta = 1.15f;
-    public bool permiteSalpicaderas = true;
+    [Header("Precios Extra por Accesorio")]
+    public float precioLuz1 = 250f;
+    public float precioLuz2 = 300f;
+    public float precioSalpicadera1 = 200f;
+    public float precioSalpicadera2 = 350f;
 
-    private Color[] coloresOriginales;
-    private Vector3 escalaOriginalDelantera;
-    private Vector3 escalaOriginalTrasera;
-    private Vector3 posicionOriginalBici;
-    private Vector3 escalaOriginalBici;
-    private Quaternion rotacionOriginalBici;
-    private bool inicializado = false;
+    private Color[] coloresIniciales;
+    private Vector3 escalaInicialDelantera;
+    private Vector3 escalaInicialTrasera;
+    private Vector3 posicionInicial;
+    private Quaternion rotacionInicial;
+    private Vector3 escalaInicialBici;
+    private bool estadoGuardado = false;
+
+    private void Awake()
+    {
+        if (objLuz1 != null) objLuz1.SetActive(false);
+        if (objLuz2 != null) objLuz2.SetActive(false);
+        if (objSalpicadera1 != null) objSalpicadera1.SetActive(false);
+        if (objSalpicadera2 != null) objSalpicadera2.SetActive(false);
+    }
 
     public void GuardarEstadoInicial()
     {
-        if (inicializado) return;
+        if (estadoGuardado) return;
+
+        posicionInicial = transform.localPosition;
+        rotacionInicial = transform.localRotation;
+        escalaInicialBici = transform.localScale;
 
         if (renderersCuadro != null && renderersCuadro.Length > 0)
         {
-            coloresOriginales = new Color[renderersCuadro.Length];
+            coloresIniciales = new Color[renderersCuadro.Length];
             for (int i = 0; i < renderersCuadro.Length; i++)
             {
                 if (renderersCuadro[i] != null)
-                {
-                    Material[] mats = renderersCuadro[i].materials;
-                    int idx = Mathf.Clamp(indiceMaterialCuadro, 0, mats.Length - 1);
-                    coloresOriginales[i] = mats[idx].color;
-                }
+                    coloresIniciales[i] = renderersCuadro[i].material.color;
             }
         }
 
-        if (llantaDelantera != null) escalaOriginalDelantera = llantaDelantera.localScale;
-        if (llantaTrasera != null) escalaOriginalTrasera = llantaTrasera.localScale;
+        if (ruedaDelantera != null) escalaInicialDelantera = ruedaDelantera.localScale;
+        if (ruedaTrasera != null) escalaInicialTrasera = ruedaTrasera.localScale;
 
-        posicionOriginalBici = transform.localPosition;
-        escalaOriginalBici = transform.localScale;
-        rotacionOriginalBici = transform.localRotation;
-        inicializado = true;
+        estadoGuardado = true;
     }
 
     public void AplicarColorCuadro(Color nuevoColor)
     {
-        GuardarEstadoInicial();
         if (renderersCuadro == null) return;
-
-        for (int i = 0; i < renderersCuadro.Length; i++)
+        foreach (Renderer rend in renderersCuadro)
         {
-            if (renderersCuadro[i] != null)
-            {
-                Material[] mats = renderersCuadro[i].materials;
-                int idx = Mathf.Clamp(indiceMaterialCuadro, 0, mats.Length - 1);
-                mats[idx].color = nuevoColor;
-            }
+            if (rend != null)
+                rend.material.color = nuevoColor;
         }
     }
 
     public void AplicarDimensionesLlantas(float factorAncho, float factorRodada)
     {
-        GuardarEstadoInicial();
-
-        if (llantaDelantera != null)
+        if (ruedaDelantera != null)
         {
-            llantaDelantera.localScale = new Vector3(
-                escalaOriginalDelantera.x * factorAncho,
-                escalaOriginalDelantera.y * factorRodada,
-                escalaOriginalDelantera.z * factorRodada
+            ruedaDelantera.localScale = new Vector3(
+                escalaInicialDelantera.x * factorAncho,
+                escalaInicialDelantera.y * factorRodada,
+                escalaInicialDelantera.z * factorRodada
             );
         }
 
-        if (llantaTrasera != null)
+        if (ruedaTrasera != null)
         {
-            llantaTrasera.localScale = new Vector3(
-                escalaOriginalTrasera.x * factorAncho,
-                escalaOriginalTrasera.y * factorRodada,
-                escalaOriginalTrasera.z * factorRodada
+            ruedaTrasera.localScale = new Vector3(
+                escalaInicialTrasera.x * factorAncho,
+                escalaInicialTrasera.y * factorRodada,
+                escalaInicialTrasera.z * factorRodada
             );
         }
     }
 
     public void ReiniciarBici()
     {
-        GuardarEstadoInicial();
-
-        if (renderersCuadro != null && coloresOriginales != null)
+        if (estadoGuardado)
         {
-            for (int i = 0; i < renderersCuadro.Length; i++)
+            transform.localPosition = posicionInicial;
+            transform.localRotation = rotacionInicial;
+            transform.localScale = escalaInicialBici;
+
+            if (renderersCuadro != null && coloresIniciales != null)
             {
-                if (renderersCuadro[i] != null && i < coloresOriginales.Length)
+                for (int i = 0; i < renderersCuadro.Length; i++)
                 {
-                    Material[] mats = renderersCuadro[i].materials;
-                    int idx = Mathf.Clamp(indiceMaterialCuadro, 0, mats.Length - 1);
-                    mats[idx].color = coloresOriginales[i];
+                    if (renderersCuadro[i] != null && i < coloresIniciales.Length)
+                        renderersCuadro[i].material.color = coloresIniciales[i];
                 }
             }
+
+            if (ruedaDelantera != null) ruedaDelantera.localScale = escalaInicialDelantera;
+            if (ruedaTrasera != null) ruedaTrasera.localScale = escalaInicialTrasera;
         }
 
-        if (llantaDelantera != null) llantaDelantera.localScale = escalaOriginalDelantera;
-        if (llantaTrasera != null) llantaTrasera.localScale = escalaOriginalTrasera;
-
-        if (objLuces != null) objLuces.SetActive(false);
-        if (objSalpicaderas != null) objSalpicaderas.SetActive(false);
-        if (objEstampas != null) objEstampas.SetActive(false);
-
-        transform.localPosition = posicionOriginalBici;
-        transform.localScale = escalaOriginalBici;
-        transform.localRotation = rotacionOriginalBici;
+        if (objLuz1 != null) objLuz1.SetActive(false);
+        if (objLuz2 != null) objLuz2.SetActive(false);
+        if (objSalpicadera1 != null) objSalpicadera1.SetActive(false);
+        if (objSalpicadera2 != null) objSalpicadera2.SetActive(false);
     }
 }

@@ -175,7 +175,7 @@ public class GestorPersonalizacionAR : MonoBehaviour
         ActualizarFichaTecnica();
     }
 
-    // --- 4. BOTÓN ACCESORIOS ---
+    // --- 4. BOTÓN ACCESORIOS (2 LUCES + 2 SALPICADERAS CON VALIDACIÓN) ---
     public void AbrirSubpanelAccesorios()
     {
         CerrarTodosLosSubpaneles();
@@ -185,35 +185,64 @@ public class GestorPersonalizacionAR : MonoBehaviour
         if (subpanelAccesorios != null) subpanelAccesorios.SetActive(true);
     }
 
-    public void AlternarLuces()
+    // Botón Luz 1 (Accesorio1 - Permitida en todas)
+    public void AlternarLuz1()
     {
-        if (biciActual == null || biciActual.objLuces == null) return;
-        biciActual.objLuces.SetActive(!biciActual.objLuces.activeSelf);
+        if (biciActual == null || biciActual.objLuz1 == null) return;
+        bool nuevoEstado = !biciActual.objLuz1.activeSelf;
+        biciActual.objLuz1.SetActive(nuevoEstado);
+        if (nuevoEstado && biciActual.objLuz2 != null) biciActual.objLuz2.SetActive(false);
         ActualizarFichaTecnica();
     }
 
-    public void AlternarSalpicaderas()
+    // Botón Luz 2 (Accesorio2 - Permitida en todas)
+    public void AlternarLuz2()
+    {
+        if (biciActual == null || biciActual.objLuz2 == null) return;
+        bool nuevoEstado = !biciActual.objLuz2.activeSelf;
+        biciActual.objLuz2.SetActive(nuevoEstado);
+        if (nuevoEstado && biciActual.objLuz1 != null) biciActual.objLuz1.SetActive(false);
+        ActualizarFichaTecnica();
+    }
+
+    // Botón Salpicadera 1 (Accesorio3 - Solo Grupo_Tradicional)
+    public void AlternarSalpicadera1()
     {
         if (biciActual == null) return;
 
-        if (!biciActual.permiteSalpicaderas)
+        if (biciActual.tipoCuadro != BiciPersonalizable.TipoCuadro.Tradicional)
         {
-            MostrarAlerta($"¡Advertencia! Estas salpicaderas no funcionarán en este cuadro de {biciActual.categoria}.");
+            MostrarAlerta("Por el tipo de cuadro no se recomienda agregar estas salpicaderas.");
             return;
         }
 
-        if (biciActual.objSalpicaderas != null)
+        if (biciActual.objSalpicadera1 != null)
         {
-            biciActual.objSalpicaderas.SetActive(!biciActual.objSalpicaderas.activeSelf);
+            bool nuevoEstado = !biciActual.objSalpicadera1.activeSelf;
+            biciActual.objSalpicadera1.SetActive(nuevoEstado);
+            if (nuevoEstado && biciActual.objSalpicadera2 != null) biciActual.objSalpicadera2.SetActive(false);
             ActualizarFichaTecnica();
         }
     }
 
-    public void AlternarEstampas()
+    // Botón Salpicadera 2 (Accesorio4 - Solo Grupo_Competencia y Grupo_Montana)
+    public void AlternarSalpicadera2()
     {
-        if (biciActual == null || biciActual.objEstampas == null) return;
-        biciActual.objEstampas.SetActive(!biciActual.objEstampas.activeSelf);
-        ActualizarFichaTecnica();
+        if (biciActual == null) return;
+
+        if (biciActual.tipoCuadro == BiciPersonalizable.TipoCuadro.Tradicional)
+        {
+            MostrarAlerta("Por el tipo de cuadro no se recomienda agregar estas salpicaderas.");
+            return;
+        }
+
+        if (biciActual.objSalpicadera2 != null)
+        {
+            bool nuevoEstado = !biciActual.objSalpicadera2.activeSelf;
+            biciActual.objSalpicadera2.SetActive(nuevoEstado);
+            if (nuevoEstado && biciActual.objSalpicadera1 != null) biciActual.objSalpicadera1.SetActive(false);
+            ActualizarFichaTecnica();
+        }
     }
 
     // --- BOTÓN REINICIAR ---
@@ -262,10 +291,10 @@ public class GestorPersonalizacionAR : MonoBehaviour
         if (biciActual == null) return;
 
         float total = biciActual.precioBase;
-        if (biciActual.objLuces != null && biciActual.objLuces.activeSelf) total += biciActual.precioLuces;
-        if (biciActual.objSalpicaderas != null && biciActual.objSalpicaderas.activeSelf) total += biciActual.precioSalpicaderas;
-        if (biciActual.objEstampas != null && biciActual.objEstampas.activeSelf) total += biciActual.precioEstampas;
-        if (factorAnchoActual > 1.05f || factorRodadaActual > 1.04f) total += biciActual.precioLlantaExtra;
+        if (biciActual.objLuz1 != null && biciActual.objLuz1.activeSelf) total += biciActual.precioLuz1;
+        if (biciActual.objLuz2 != null && biciActual.objLuz2.activeSelf) total += biciActual.precioLuz2;
+        if (biciActual.objSalpicadera1 != null && biciActual.objSalpicadera1.activeSelf) total += biciActual.precioSalpicadera1;
+        if (biciActual.objSalpicadera2 != null && biciActual.objSalpicadera2.activeSelf) total += biciActual.precioSalpicadera2;
 
         if (txtNombreBici != null) txtNombreBici.text = biciActual.nombreModelo;
         if (txtDescripcionBici != null) txtDescripcionBici.text = biciActual.descripcion;
