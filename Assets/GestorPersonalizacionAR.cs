@@ -1,6 +1,7 @@
 using System.Collections;
 using System.IO;
 using UnityEngine;
+using UnityEngine.UI;
 using TMPro;
 
 public class GestorPersonalizacionAR : MonoBehaviour
@@ -8,302 +9,91 @@ public class GestorPersonalizacionAR : MonoBehaviour
     [Header("Paneles Principales")]
     public GameObject panelPersonalizado;
     public GameObject menuBotonesPrincipales;
-    public GameObject canvasCompleto;
 
-    [Header("Subpaneles de Opciones")]
+    [Header("Subpaneles de Edición")]
     public GameObject subpanelManipulacion;
     public GameObject subpanelColor;
     public GameObject subpanelLlantas;
     public GameObject subpanelAccesorios;
 
-    [Header("Textos de Panel_FichaTecnica")]
-    public TextMeshProUGUI txtNombreBici;
-    public TextMeshProUGUI txtDescripcionBici;
-    public TextMeshProUGUI txtPrecioTotal;
-
-    [Header("Panel de Advertencias / Notificaciones")]
-    public GameObject panelAlerta;
-    public TextMeshProUGUI txtMensajeAlerta;
-
-    [Header("Script de Manipulación AR")]
+    [Header("Script de Manipulación Táctil AR")]
     public ManipularBicicletaAR scriptManipulacionAR;
 
-    private BiciPersonalizable biciActual;
-    private float factorAnchoActual = 1.0f;
-    private float factorRodadaActual = 1.0f;
-    private bool subpanelAbierto = false;
+    [Header("Panel de Alerta (Incompatibilidad)")]
+    public GameObject panelAlerta;
+    public TextMeshProUGUI txtMensajeAlerta;
+    public float duracionAlerta = 3.0f;
 
-    public void IniciarPersonalizacion(GameObject biciObj)
+    [Header("Ficha Técnica y Precio en Pantalla")]
+    public TextMeshProUGUI txtNombreBici; // Usado para mostrar toda la ficha en bloque limpio
+
+    [Header("Selector de Color (Rueda Cromática)")]
+    public Image imagenRuedaColor;
+
+    private BiciPersonalizable biciActual;
+    private float factorRodadaActual = 1.0f;
+    private float factorAnchoActual = 1.0f;
+    private float velocidadManipulacion = 0.05f;
+    private Coroutine corrutinaAlerta;
+
+    private void Start()
     {
-        biciActual = biciObj.GetComponent<BiciPersonalizable>();
+        if (panelPersonalizado != null) panelPersonalizado.SetActive(false);
+        if (panelAlerta != null) panelAlerta.SetActive(false);
+        CerrarTodosLosSubpaneles();
+    }
+
+    // --- CONEXIÓN CON CONTROLCORTINA.CS ---
+    public void IniciarPersonalizacion(GameObject biciSeleccionada)
+    {
+        if (biciSeleccionada == null) return;
+
+        biciActual = biciSeleccionada.GetComponent<BiciPersonalizable>();
+
         if (biciActual != null)
         {
             biciActual.GuardarEstadoInicial();
+            if (biciActual.objLuz1 != null) biciActual.objLuz1.SetActive(false);
+            if (biciActual.objLuz2 != null) biciActual.objLuz2.SetActive(false);
+            if (biciActual.objSalpicadera1 != null) biciActual.objSalpicadera1.SetActive(false);
+            if (biciActual.objSalpicadera2 != null) biciActual.objSalpicadera2.SetActive(false);
         }
 
-        factorAnchoActual = 1.0f;
         factorRodadaActual = 1.0f;
-        CerrarTodosLosSubpaneles();
+        factorAnchoActual = 1.0f;
 
         if (panelPersonalizado != null) panelPersonalizado.SetActive(true);
         if (menuBotonesPrincipales != null) menuBotonesPrincipales.SetActive(true);
         if (panelAlerta != null) panelAlerta.SetActive(false);
-        if (scriptManipulacionAR != null) scriptManipulacionAR.DesactivarManipulacion();
 
-        ActualizarFichaTecnica();
+        CerrarTodosLosSubpaneles();
+        ActualizarFichaYPrecio();
     }
 
     public void SalirDePersonalizacion()
     {
-        CerrarTodosLosSubpaneles();
+        if (biciActual != null)
+        {
+            biciActual.ReiniciarBici();
+            biciActual = null;
+        }
+
+        if (scriptManipulacionAR != null) scriptManipulacionAR.DesactivarManipulacion();
         if (panelPersonalizado != null) panelPersonalizado.SetActive(false);
         if (panelAlerta != null) panelAlerta.SetActive(false);
-        if (scriptManipulacionAR != null) scriptManipulacionAR.DesactivarManipulacion();
-    }
-
-    // --- 1. BOTÓN MANIPULACIÓN ---
-    public void ActivarModoManipulacion()
-    {
         CerrarTodosLosSubpaneles();
-        subpanelAbierto = true;
-        if (menuBotonesPrincipales != null) menuBotonesPrincipales.SetActive(false);
-        if (subpanelManipulacion != null) subpanelManipulacion.SetActive(true);
-
-        if (scriptManipulacionAR != null && biciActual != null)
-        {
-            scriptManipulacionAR.ActivarManipulacion(biciActual.gameObject);
-        }
-    }
-
-    // --- 2. BOTÓN COLOR (SOLO CUADRO) ---
-    public void AbrirSubpanelColor()
-    {
-        CerrarTodosLosSubpaneles();
-        if (scriptManipulacionAR != null) scriptManipulacionAR.DesactivarManipulacion();
-        subpanelAbierto = true;
-        if (menuBotonesPrincipales != null) menuBotonesPrincipales.SetActive(false);
-        if (subpanelColor != null) subpanelColor.SetActive(true);
-    }
-
-    public void CambiarColorCuadro(string hexColor)
-    {
-        if (biciActual == null) return;
-
-        if (ColorUtility.TryParseHtmlString(hexColor, out Color nuevoColor))
-        {
-            biciActual.AplicarColorCuadro(nuevoColor);
-        }
-    }
-
-    public void CambiarColorCuadroDirecto(Color nuevoColor)
-    {
-        if (biciActual == null) return;
-        biciActual.AplicarColorCuadro(nuevoColor);
-    }
-
-    // --- 3. BOTÓN LLANTAS (4 BOTONES: RODADA +/- Y ANCHO +/-) ---
-    public void AbrirSubpanelLlantas()
-    {
-        CerrarTodosLosSubpaneles();
-        if (scriptManipulacionAR != null) scriptManipulacionAR.DesactivarManipulacion();
-        subpanelAbierto = true;
-        if (menuBotonesPrincipales != null) menuBotonesPrincipales.SetActive(false);
-        if (subpanelLlantas != null) subpanelLlantas.SetActive(true);
-    }
-
-    public void AumentarRodada()
-    {
-        if (biciActual == null) return;
-        float nuevaRodada = factorRodadaActual + 0.08f;
-
-        if (nuevaRodada > biciActual.rodadaMaximaLlanta)
-        {
-            MostrarAlerta($"¡Incompatible! Una rodada más grande chocaría con la horquilla del cuadro de {biciActual.categoria}.");
-            return;
-        }
-
-        factorRodadaActual = nuevaRodada;
-        biciActual.AplicarDimensionesLlantas(factorAnchoActual, factorRodadaActual);
-        ActualizarFichaTecnica();
-    }
-
-    public void DisminuirRodada()
-    {
-        if (biciActual == null) return;
-        float nuevaRodada = factorRodadaActual - 0.08f;
-
-        if (nuevaRodada < 0.76f)
-        {
-            MostrarAlerta("¡Límite alcanzado! No se puede reducir más la rodada de la bicicleta.");
-            return;
-        }
-
-        factorRodadaActual = nuevaRodada;
-        biciActual.AplicarDimensionesLlantas(factorAnchoActual, factorRodadaActual);
-        ActualizarFichaTecnica();
-    }
-
-    public void AumentarAnchoLlanta()
-    {
-        if (biciActual == null) return;
-        float nuevoAncho = factorAnchoActual + 0.15f;
-
-        if (nuevoAncho > biciActual.anchoMaximoLlanta)
-        {
-            MostrarAlerta($"¡Incompatible! Estas llantas son demasiado anchas para el cuadro de {biciActual.categoria}.");
-            return;
-        }
-
-        factorAnchoActual = nuevoAncho;
-        biciActual.AplicarDimensionesLlantas(factorAnchoActual, factorRodadaActual);
-        ActualizarFichaTecnica();
-    }
-
-    public void DisminuirAnchoLlanta()
-    {
-        if (biciActual == null) return;
-        float nuevoAncho = factorAnchoActual - 0.15f;
-
-        if (nuevoAncho < 0.70f)
-        {
-            MostrarAlerta("¡Límite alcanzado! No se puede hacer más delgada la llanta.");
-            return;
-        }
-
-        factorAnchoActual = nuevoAncho;
-        biciActual.AplicarDimensionesLlantas(factorAnchoActual, factorRodadaActual);
-        ActualizarFichaTecnica();
-    }
-
-    // --- 4. BOTÓN ACCESORIOS (2 LUCES + 2 SALPICADERAS CON VALIDACIÓN) ---
-    public void AbrirSubpanelAccesorios()
-    {
-        CerrarTodosLosSubpaneles();
-        if (scriptManipulacionAR != null) scriptManipulacionAR.DesactivarManipulacion();
-        subpanelAbierto = true;
-        if (menuBotonesPrincipales != null) menuBotonesPrincipales.SetActive(false);
-        if (subpanelAccesorios != null) subpanelAccesorios.SetActive(true);
-    }
-
-    // Botón Luz 1 (Accesorio1 - Permitida en todas)
-    public void AlternarLuz1()
-    {
-        if (biciActual == null || biciActual.objLuz1 == null) return;
-        bool nuevoEstado = !biciActual.objLuz1.activeSelf;
-        biciActual.objLuz1.SetActive(nuevoEstado);
-        if (nuevoEstado && biciActual.objLuz2 != null) biciActual.objLuz2.SetActive(false);
-        ActualizarFichaTecnica();
-    }
-
-    // Botón Luz 2 (Accesorio2 - Permitida en todas)
-    public void AlternarLuz2()
-    {
-        if (biciActual == null || biciActual.objLuz2 == null) return;
-        bool nuevoEstado = !biciActual.objLuz2.activeSelf;
-        biciActual.objLuz2.SetActive(nuevoEstado);
-        if (nuevoEstado && biciActual.objLuz1 != null) biciActual.objLuz1.SetActive(false);
-        ActualizarFichaTecnica();
-    }
-
-    // Botón Salpicadera 1 (Accesorio3 - Solo Grupo_Tradicional)
-    public void AlternarSalpicadera1()
-    {
-        if (biciActual == null) return;
-
-        if (biciActual.tipoCuadro != BiciPersonalizable.TipoCuadro.Tradicional)
-        {
-            MostrarAlerta("Por el tipo de cuadro no se recomienda agregar estas salpicaderas.");
-            return;
-        }
-
-        if (biciActual.objSalpicadera1 != null)
-        {
-            bool nuevoEstado = !biciActual.objSalpicadera1.activeSelf;
-            biciActual.objSalpicadera1.SetActive(nuevoEstado);
-            if (nuevoEstado && biciActual.objSalpicadera2 != null) biciActual.objSalpicadera2.SetActive(false);
-            ActualizarFichaTecnica();
-        }
-    }
-
-    // Botón Salpicadera 2 (Accesorio4 - Solo Grupo_Competencia y Grupo_Montana)
-    public void AlternarSalpicadera2()
-    {
-        if (biciActual == null) return;
-
-        if (biciActual.tipoCuadro == BiciPersonalizable.TipoCuadro.Tradicional)
-        {
-            MostrarAlerta("Por el tipo de cuadro no se recomienda agregar estas salpicaderas.");
-            return;
-        }
-
-        if (biciActual.objSalpicadera2 != null)
-        {
-            bool nuevoEstado = !biciActual.objSalpicadera2.activeSelf;
-            biciActual.objSalpicadera2.SetActive(nuevoEstado);
-            if (nuevoEstado && biciActual.objSalpicadera1 != null) biciActual.objSalpicadera1.SetActive(false);
-            ActualizarFichaTecnica();
-        }
-    }
-
-    // --- BOTÓN REINICIAR ---
-    public void ReiniciarBicicleta()
-    {
-        if (biciActual == null) return;
-        biciActual.ReiniciarBici();
-        factorAnchoActual = 1.0f;
-        factorRodadaActual = 1.0f;
-        ActualizarFichaTecnica();
-
-        if (scriptManipulacionAR != null && subpanelManipulacion != null && subpanelManipulacion.activeSelf)
-        {
-            scriptManipulacionAR.ActivarManipulacion(biciActual.gameObject);
-        }
-    }
-
-    // --- 5. BOTÓN GUARDAR PNG ---
-    public void GuardarImagenPNG()
-    {
-        StartCoroutine(CapturarPNG());
-    }
-
-    private IEnumerator CapturarPNG()
-    {
-        if (canvasCompleto != null) canvasCompleto.SetActive(false);
-        yield return new WaitForEndOfFrame();
-
-        Texture2D foto = new Texture2D(Screen.width, Screen.height, TextureFormat.RGBA32, false);
-        foto.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0);
-        foto.Apply();
-
-        byte[] bytes = foto.EncodeToPNG();
-        Destroy(foto);
-
-        string nombre = $"BiciAR_{System.DateTime.Now:yyyyMMdd_HHmmss}.png";
-        string ruta = Path.Combine(Application.persistentDataPath, nombre);
-        File.WriteAllBytes(ruta, bytes);
-
-        if (canvasCompleto != null) canvasCompleto.SetActive(true);
-        MostrarAlerta($"¡Imagen PNG guardada!\n{nombre}");
-    }
-
-    private void ActualizarFichaTecnica()
-    {
-        if (biciActual == null) return;
-
-        float total = biciActual.precioBase;
-        if (biciActual.objLuz1 != null && biciActual.objLuz1.activeSelf) total += biciActual.precioLuz1;
-        if (biciActual.objLuz2 != null && biciActual.objLuz2.activeSelf) total += biciActual.precioLuz2;
-        if (biciActual.objSalpicadera1 != null && biciActual.objSalpicadera1.activeSelf) total += biciActual.precioSalpicadera1;
-        if (biciActual.objSalpicadera2 != null && biciActual.objSalpicadera2.activeSelf) total += biciActual.precioSalpicadera2;
-
-        if (txtNombreBici != null) txtNombreBici.text = biciActual.nombreModelo;
-        if (txtDescripcionBici != null) txtDescripcionBici.text = biciActual.descripcion;
-        if (txtPrecioTotal != null) txtPrecioTotal.text = $"Precio: ${total:N2} MXN";
     }
 
     public bool IntentarCerrarSubpanel()
     {
-        if (subpanelAbierto)
+        bool habiaModoEdicionActivo =
+            (subpanelManipulacion != null && subpanelManipulacion.activeSelf) ||
+            (subpanelColor != null && subpanelColor.activeSelf) ||
+            (subpanelLlantas != null && subpanelLlantas.activeSelf) ||
+            (subpanelAccesorios != null && subpanelAccesorios.activeSelf) ||
+            (menuBotonesPrincipales != null && !menuBotonesPrincipales.activeSelf);
+
+        if (habiaModoEdicionActivo)
         {
             CerrarTodosLosSubpaneles();
             if (scriptManipulacionAR != null) scriptManipulacionAR.DesactivarManipulacion();
@@ -313,26 +103,298 @@ public class GestorPersonalizacionAR : MonoBehaviour
         return false;
     }
 
+    // --- APERTURA DE SUBPANELES (OCULTA LOS BOTONES PRINCIPALES) ---
+    public void AbrirSubpanelManipulacion()
+    {
+        CerrarTodosLosSubpaneles();
+        if (menuBotonesPrincipales != null) menuBotonesPrincipales.SetActive(false);
+        if (subpanelManipulacion != null) subpanelManipulacion.SetActive(true);
+        if (scriptManipulacionAR != null && biciActual != null)
+            scriptManipulacionAR.ActivarManipulacion(biciActual.gameObject);
+    }
+
+    public void AbrirSubpanelColor()
+    {
+        CerrarTodosLosSubpaneles();
+        if (scriptManipulacionAR != null) scriptManipulacionAR.DesactivarManipulacion();
+        if (menuBotonesPrincipales != null) menuBotonesPrincipales.SetActive(false);
+        if (subpanelColor != null) subpanelColor.SetActive(true);
+    }
+
+    public void AbrirSubpanelLlantas()
+    {
+        CerrarTodosLosSubpaneles();
+        if (scriptManipulacionAR != null) scriptManipulacionAR.DesactivarManipulacion();
+        if (menuBotonesPrincipales != null) menuBotonesPrincipales.SetActive(false);
+        if (subpanelLlantas != null) subpanelLlantas.SetActive(true);
+    }
+
+    public void AbrirSubpanelAccesorios()
+    {
+        CerrarTodosLosSubpaneles();
+        if (scriptManipulacionAR != null) scriptManipulacionAR.DesactivarManipulacion();
+        if (menuBotonesPrincipales != null) menuBotonesPrincipales.SetActive(false);
+        if (subpanelAccesorios != null) subpanelAccesorios.SetActive(true);
+    }
+
     private void CerrarTodosLosSubpaneles()
     {
-        subpanelAbierto = false;
         if (subpanelManipulacion != null) subpanelManipulacion.SetActive(false);
         if (subpanelColor != null) subpanelColor.SetActive(false);
         if (subpanelLlantas != null) subpanelLlantas.SetActive(false);
         if (subpanelAccesorios != null) subpanelAccesorios.SetActive(false);
     }
 
-    public void MostrarAlerta(string msg)
+    // --- 1. COLOR DEL CUADRO ---
+    public void SeleccionarColorDesdeUI()
     {
-        if (panelAlerta != null && txtMensajeAlerta != null)
+        if (biciActual == null || imagenRuedaColor == null) return;
+
+        RectTransform rectTransform = imagenRuedaColor.rectTransform;
+        Vector2 puntoLocal;
+        if (RectTransformUtility.ScreenPointToLocalPointInRectangle(rectTransform, Input.mousePosition, null, out puntoLocal))
         {
-            txtMensajeAlerta.text = msg;
-            panelAlerta.SetActive(true);
+            Rect rect = rectTransform.rect;
+            float normX = Mathf.Clamp01((puntoLocal.x - rect.x) / rect.width);
+            float normY = Mathf.Clamp01((puntoLocal.y - rect.y) / rect.height);
+
+            Texture2D tex = imagenRuedaColor.sprite.texture;
+            if (tex != null && tex.isReadable)
+            {
+                Color colorElegido = tex.GetPixelBilinear(normX, normY);
+                if (colorElegido.a > 0.1f)
+                {
+                    biciActual.AplicarColorCuadro(colorElegido);
+                }
+            }
         }
     }
 
-    public void CerrarAlerta()
+    public void AplicarColorPredefinido(Color color)
     {
+        if (biciActual != null) biciActual.AplicarColorCuadro(color);
+    }
+
+    public void CambiarColorCuadroDirecto(Color color)
+    {
+        if (biciActual != null) biciActual.AplicarColorCuadro(color);
+    }
+
+    // --- 2. LLANTAS (RODADA Y ANCHO) ---
+    public void AumentarRodada()
+    {
+        if (biciActual == null) return;
+        if (factorRodadaActual + 0.04f <= biciActual.rodadaMaximaLlanta)
+        {
+            factorRodadaActual += 0.04f;
+            biciActual.AplicarDimensionesLlantas(factorAnchoActual, factorRodadaActual);
+        }
+        else
+        {
+            MostrarAlerta("Has alcanzado la rodada máxima permitida para este cuadro.");
+        }
+    }
+
+    public void DisminuirRodada()
+    {
+        if (biciActual == null) return;
+        if (factorRodadaActual - 0.04f >= 0.80f)
+        {
+            factorRodadaActual -= 0.04f;
+            biciActual.AplicarDimensionesLlantas(factorAnchoActual, factorRodadaActual);
+        }
+    }
+
+    public void AumentarAnchoLlanta()
+    {
+        if (biciActual == null) return;
+        if (factorAnchoActual + 0.05f <= biciActual.anchoMaximoLlanta)
+        {
+            factorAnchoActual += 0.05f;
+            biciActual.AplicarDimensionesLlantas(factorAnchoActual, factorRodadaActual);
+        }
+        else
+        {
+            MostrarAlerta("El ancho de llanta excede el espacio de la horquilla.");
+        }
+    }
+
+    public void DisminuirAnchoLlanta()
+    {
+        if (biciActual == null) return;
+        if (factorAnchoActual - 0.05f >= 0.75f)
+        {
+            factorAnchoActual -= 0.05f;
+            biciActual.AplicarDimensionesLlantas(factorAnchoActual, factorRodadaActual);
+        }
+    }
+
+    // --- 3. ACCESORIOS CON VALIDACIÓN DE CUADRO ---
+    public void AlternarLuz1()
+    {
+        if (biciActual == null || biciActual.objLuz1 == null) return;
+        biciActual.objLuz1.SetActive(!biciActual.objLuz1.activeSelf);
+        ActualizarFichaYPrecio();
+    }
+
+    public void AlternarLuz2()
+    {
+        if (biciActual == null || biciActual.objLuz2 == null) return;
+        biciActual.objLuz2.SetActive(!biciActual.objLuz2.activeSelf);
+        ActualizarFichaYPrecio();
+    }
+
+    public void AlternarSalpicadera1()
+    {
+        if (biciActual == null || biciActual.objSalpicadera1 == null) return;
+
+        if (biciActual.tipoCuadro != BiciPersonalizable.TipoCuadro.Tradicional)
+        {
+            MostrarAlerta("Por el tipo de cuadro no se recomienda agregar estas salpicaderas.");
+            return;
+        }
+
+        biciActual.objSalpicadera1.SetActive(!biciActual.objSalpicadera1.activeSelf);
+        ActualizarFichaYPrecio();
+    }
+
+    public void AlternarSalpicadera2()
+    {
+        if (biciActual == null || biciActual.objSalpicadera2 == null) return;
+
+        if (biciActual.tipoCuadro == BiciPersonalizable.TipoCuadro.Tradicional)
+        {
+            MostrarAlerta("Por el tipo de cuadro no se recomienda agregar estas salpicaderas.");
+            return;
+        }
+
+        biciActual.objSalpicadera2.SetActive(!biciActual.objSalpicadera2.activeSelf);
+        ActualizarFichaYPrecio();
+    }
+
+    // --- 4. BOTÓN GUARDAR PNG Y ENVIAR A TIENDA ---
+    public void GuardarImagenPNG()
+    {
+        StartCoroutine(CapturarYCompartirPNG());
+    }
+
+    private IEnumerator CapturarYCompartirPNG()
+    {
+        if (menuBotonesPrincipales != null) menuBotonesPrincipales.SetActive(false);
+        CerrarTodosLosSubpaneles();
+        if (panelAlerta != null) panelAlerta.SetActive(false);
+
+        yield return new WaitForEndOfFrame();
+
+        Texture2D foto = new Texture2D(Screen.width, Screen.height, TextureFormat.RGBA32, false);
+        foto.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0);
+        foto.Apply();
+
+        byte[] bytes = foto.EncodeToPNG();
+        Destroy(foto);
+
+        string nombreArchivo = $"Cotizacion_BiciAR_{System.DateTime.Now:yyyyMMdd_HHmmss}.png";
+        string rutaArchivo = Path.Combine(Application.temporaryCachePath, nombreArchivo);
+        File.WriteAllBytes(rutaArchivo, bytes);
+
+        if (menuBotonesPrincipales != null) menuBotonesPrincipales.SetActive(true);
+
+        string resumenPedido = ConstruirResumenPedido();
+
+        new NativeShare()
+            .AddFile(rutaArchivo)
+            .SetSubject("Cotización de Bicicleta Personalizada AR")
+            .SetText(resumenPedido)
+            .Share();
+    }
+
+    private string ConstruirResumenPedido()
+    {
+        if (biciActual == null)
+            return "Hola, te envío el diseño de mi bicicleta personalizada desde BiciAR.";
+
+        float total = biciActual.precioBase;
+        string listaAccesorios = "";
+
+        if (biciActual.objLuz1 != null && biciActual.objLuz1.activeSelf)
+        {
+            total += biciActual.precioLuz1;
+            listaAccesorios += $"\n• Luz Frontal LED (+${biciActual.precioLuz1:N0} MXN)";
+        }
+        if (biciActual.objLuz2 != null && biciActual.objLuz2.activeSelf)
+        {
+            total += biciActual.precioLuz2;
+            listaAccesorios += $"\n• Luz Trasera / Doble (+${biciActual.precioLuz2:N0} MXN)";
+        }
+        if (biciActual.objSalpicadera1 != null && biciActual.objSalpicadera1.activeSelf)
+        {
+            total += biciActual.precioSalpicadera1;
+            listaAccesorios += $"\n• Salpicadera Clásica (+${biciActual.precioSalpicadera1:N0} MXN)";
+        }
+        if (biciActual.objSalpicadera2 != null && biciActual.objSalpicadera2.activeSelf)
+        {
+            total += biciActual.precioSalpicadera2;
+            listaAccesorios += $"\n• Salpicadera Deportiva/MTB (+${biciActual.precioSalpicadera2:N0} MXN)";
+        }
+
+        if (string.IsNullOrEmpty(listaAccesorios))
+            listaAccesorios = "\n• Sin accesorios extra";
+
+        return $"¡Hola! Me gustaría cotizar y pedir esta bicicleta personalizada en AR:\n\n" +
+               $"Modelo: {biciActual.nombreModelo} ({biciActual.categoria})\n" +
+               $"Rodada: x{factorRodadaActual:F2} | Ancho llanta: x{factorAnchoActual:F2}\n" +
+               $"Accesorios incluidos:{listaAccesorios}\n\n" +
+               $"Total estimado: ${total:N2} MXN";
+    }
+
+    // --- 5. REINICIAR Y ACTUALIZACIÓN DE PRECIOS ---
+    public void ReiniciarPersonalizacion()
+    {
+        if (biciActual != null)
+        {
+            biciActual.ReiniciarBici();
+        }
+
+        factorRodadaActual = 1.0f;
+        factorAnchoActual = 1.0f;
+        CerrarTodosLosSubpaneles();
+        if (panelAlerta != null) panelAlerta.SetActive(false);
+        ActualizarFichaYPrecio();
+    }
+
+    private void ActualizarFichaYPrecio()
+    {
+        if (biciActual == null) return;
+
+        float total = biciActual.precioBase;
+        if (biciActual.objLuz1 != null && biciActual.objLuz1.activeSelf) total += biciActual.precioLuz1;
+        if (biciActual.objLuz2 != null && biciActual.objLuz2.activeSelf) total += biciActual.precioLuz2;
+        if (biciActual.objSalpicadera1 != null && biciActual.objSalpicadera1.activeSelf) total += biciActual.precioSalpicadera1;
+        if (biciActual.objSalpicadera2 != null && biciActual.objSalpicadera2.activeSelf) total += biciActual.precioSalpicadera2;
+
+        // Ficha técnica unificada en un solo bloque con saltos de línea ordenados
+        if (txtNombreBici != null)
+        {
+            txtNombreBici.text = $"<b>{biciActual.nombreModelo} ({biciActual.categoria})</b>\n" +
+                                 $"{biciActual.descripcion}\n" +
+                                 $"<b>Total: ${total:N2} MXN</b>";
+        }
+    }
+
+    private void MostrarAlerta(string mensaje)
+    {
+        if (panelAlerta == null || txtMensajeAlerta == null) return;
+
+        txtMensajeAlerta.text = mensaje;
+        panelAlerta.SetActive(true);
+
+        if (corrutinaAlerta != null) StopCoroutine(corrutinaAlerta);
+        corrutinaAlerta = StartCoroutine(OcultarAlertaDespuesDeTiempo());
+    }
+
+    private IEnumerator OcultarAlertaDespuesDeTiempo()
+    {
+        yield return new WaitForSeconds(duracionAlerta);
         if (panelAlerta != null) panelAlerta.SetActive(false);
     }
 }
